@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+  <title>AI Photo Booth</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body class="booth-body">
+  <div class="booth-container">
+    <video id="camera" autoplay playsinline></video>
+    <canvas id="canvas" class="hidden"></canvas>
+
+    <div id="overlay" class="overlay"></div>
+
+    <button id="captureBtn" class="main-btn">צלם אותי</button>
+
+    <div id="previewArea" class="hidden">
+      <img id="preview" alt="preview" />
+      <div id="timer"></div>
+      <div class="actions">
+        <button id="keepBtn">השאר תמונה</button>
+        <button id="retakeBtn">צלם מחדש</button>
+      </div>
+    </div>
+
+    <div id="successMsg" class="success hidden">התמונה נשמרה! חזרו לטלוויזיה 🎉</div>
+  </div>
+  <script src="/static/booth.js"></script>
+</body>
+</html>
