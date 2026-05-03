@@ -36,35 +36,16 @@ def _client():
 def generate_ai_image(input_path: Path, output_path: Path, prompt: str):
     client = _client()
     with open(input_path, "rb") as image_file:
-        image_b64 = base64.b64encode(image_file.read()).decode("utf-8")
+        response = client.images.edit(
+            model="gpt-image-1",
+            image=image_file,
+            prompt=prompt,
+            size="1024x1024",
+        )
 
-    response = client.responses.create(
-        model="gpt-image-1",
-        input=[
-            {
-                "role": "user",
-                "content": [
-                    {"type": "input_text", "text": prompt},
-                    {
-                        "type": "input_image",
-                        "image_url": f"data:image/png;base64,{image_b64}",
-                    },
-                ],
-            }
-        ],
-    )
-
-    image_data = None
-    for output in response.output:
-        for content in getattr(output, "content", []):
-            if getattr(content, "type", None) == "output_image":
-                image_data = content.image_base64
-                break
-        if image_data:
-            break
-
+    image_data = response.data[0].b64_json
     if not image_data:
-        raise RuntimeError("No image returned from OpenAI")
+        raise RuntimeError("No image returned from OpenAI Images API")
 
     with open(output_path, "wb") as f:
         f.write(base64.b64decode(image_data))
