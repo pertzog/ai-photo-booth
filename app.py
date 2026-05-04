@@ -29,7 +29,9 @@ with open(FILTERS_FILE, "r", encoding="utf-8") as f:
     FILTERS = json.load(f)
 
 
-job_queue = queue.Queue()
+AI_WORKER_COUNT = max(1, min(32, int(os.getenv("AI_WORKER_COUNT", "8"))))
+AI_JOB_QUEUE_MAXSIZE = max(0, int(os.getenv("AI_JOB_QUEUE_MAXSIZE", "0")))
+job_queue = queue.Queue(maxsize=AI_JOB_QUEUE_MAXSIZE)
 
 
 def _client():
@@ -68,8 +70,16 @@ def _process_ai_jobs():
             job_queue.task_done()
 
 
-worker_thread = threading.Thread(target=_process_ai_jobs, daemon=True)
-worker_thread.start()
+worker_threads = []
+for _ in range(AI_WORKER_COUNT):
+    worker_thread = threading.Thread(target=_process_ai_jobs, daemon=True)
+    worker_thread.start()
+    worker_threads.append(worker_thread)
+
+print(
+    f"[startup] AI workers: {AI_WORKER_COUNT}; queue max size: "
+    f"{'unbounded' if AI_JOB_QUEUE_MAXSIZE == 0 else AI_JOB_QUEUE_MAXSIZE}"
+)
 
 
 @app.route("/")
@@ -112,13 +122,16 @@ def capture_photo():
         f.write(image_bytes)
 
     prompt = random.choice(FILTERS)
-    job_queue.put(
-        {
-            "input_path": original_path,
-            "output_path": ai_path,
-            "prompt": prompt,
-        }
-    )
+    job = {
+        "input_path": original_path,
+        "output_path": ai_path,
+        "prompt": prompt,
+    }
+
+    try:
+        job_queue.put_nowait(job)
+    except queue.Full:
+        return jsonify({"error": "AI queue is full, try again shortly"}), 503
 
     return jsonify({"ok": True})
 
