@@ -46,6 +46,7 @@ function captureFrame() {
 }
 
 function showPreview(dataUrl) {
+  camera.classList.add('hidden');
   preview.src = dataUrl;
   previewArea.classList.remove('hidden');
   captureBtn.classList.add('hidden');
@@ -63,6 +64,7 @@ function showPreview(dataUrl) {
 }
 
 function resetToCamera() {
+  camera.classList.remove('hidden');
   previewArea.classList.add('hidden');
   successMsg.classList.add('hidden');
   captureBtn.classList.remove('hidden');
