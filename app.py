@@ -1,7 +1,10 @@
 import base64
 import json
 import os
+import queue
 import random
+import shutil
+import threading
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -24,6 +27,9 @@ app = Flask(__name__, static_folder="static", static_url_path="/static")
 
 with open(FILTERS_FILE, "r", encoding="utf-8") as f:
     FILTERS = json.load(f)
+
+
+job_queue = queue.Queue()
 
 
 def _client():
@@ -49,6 +55,21 @@ def generate_ai_image(input_path: Path, output_path: Path, prompt: str):
 
     with open(output_path, "wb") as f:
         f.write(base64.b64decode(image_data))
+
+
+def _process_ai_jobs():
+    while True:
+        job = job_queue.get()
+        try:
+            generate_ai_image(job["input_path"], job["output_path"], job["prompt"])
+        except Exception:
+            shutil.copyfile(job["input_path"], job["output_path"])
+        finally:
+            job_queue.task_done()
+
+
+worker_thread = threading.Thread(target=_process_ai_jobs, daemon=True)
+worker_thread.start()
 
 
 @app.route("/")
@@ -91,11 +112,13 @@ def capture_photo():
         f.write(image_bytes)
 
     prompt = random.choice(FILTERS)
-
-    try:
-        generate_ai_image(original_path, ai_path, prompt)
-    except Exception as exc:
-        return jsonify({"error": f"AI generation failed: {exc}"}), 500
+    job_queue.put(
+        {
+            "input_path": original_path,
+            "output_path": ai_path,
+            "prompt": prompt,
+        }
+    )
 
     return jsonify({"ok": True})
 
