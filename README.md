@@ -23,4 +23,6 @@ To play your own Spotify playlists from the slideshow page:
 - In Spotify Developer Dashboard, add `http://localhost:5000/slideshow` (or your deployed URL) as a Redirect URI.
 - Open `/slideshow`, click **Connect Spotify**, authorize your Premium account, then use **Play** and **Stop**.
 
+The app uses Spotify Authorization Code Flow with PKCE (`response_type=code`).
+
 The slideshow Play button starts your first playlist from your Spotify account.

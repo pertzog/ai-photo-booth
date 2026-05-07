@@ -66,17 +66,22 @@ function setConnectedUi(connected) {
   spotifyConnect.classList.toggle('hidden', connected);
 }
 
-function parseTokenFromHash() {
-  const params = new URLSearchParams(window.location.hash.slice(1));
-  const accessToken = params.get('access_token');
-  const expiresIn = Number(params.get('expires_in') || 0);
+function base64UrlEncode(bytes) {
+  let binary = '';
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+}
 
-  if (!accessToken) return;
+function randomVerifier(length = 64) {
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~';
+  const arr = new Uint8Array(length);
+  crypto.getRandomValues(arr);
+  return [...arr].map((b) => alphabet[b % alphabet.length]).join('');
+}
 
-  const expiresAt = Date.now() + expiresIn * 1000;
-  localStorage.setItem('spotify_access_token', accessToken);
-  localStorage.setItem('spotify_access_token_expires_at', String(expiresAt));
-  window.history.replaceState({}, document.title, window.location.pathname);
+async function challengeFromVerifier(verifier) {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier));
+  return base64UrlEncode(new Uint8Array(digest));
 }
 
 function loadStoredToken() {
@@ -92,18 +97,61 @@ function loadStoredToken() {
   return accessToken;
 }
 
-function connectSpotify() {
+async function connectSpotify() {
   if (!spotifyClientId) {
     setStatus('Missing SPOTIFY_CLIENT_ID');
     return;
   }
 
+  const verifier = randomVerifier();
+  const challenge = await challengeFromVerifier(verifier);
+  localStorage.setItem('spotify_pkce_verifier', verifier);
+
   const authUrl = new URL('https://accounts.spotify.com/authorize');
   authUrl.searchParams.set('client_id', spotifyClientId);
-  authUrl.searchParams.set('response_type', 'token');
+  authUrl.searchParams.set('response_type', 'code');
   authUrl.searchParams.set('redirect_uri', spotifyRedirectUri);
   authUrl.searchParams.set('scope', spotifyScopes);
+  authUrl.searchParams.set('code_challenge_method', 'S256');
+  authUrl.searchParams.set('code_challenge', challenge);
   window.location.href = authUrl.toString();
+}
+
+async function exchangeCodeForToken() {
+  const params = new URLSearchParams(window.location.search);
+  const code = params.get('code');
+  const verifier = localStorage.getItem('spotify_pkce_verifier');
+
+  if (!code) return;
+  if (!verifier) {
+    setStatus('Missing PKCE verifier; reconnect Spotify.');
+    return;
+  }
+
+  const body = new URLSearchParams({
+    client_id: spotifyClientId,
+    grant_type: 'authorization_code',
+    code,
+    redirect_uri: spotifyRedirectUri,
+    code_verifier: verifier,
+  });
+
+  const res = await fetch('https://accounts.spotify.com/api/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body,
+  });
+
+  if (!res.ok) {
+    throw new Error('Token exchange failed');
+  }
+
+  const data = await res.json();
+  const expiresAt = Date.now() + Number(data.expires_in || 0) * 1000;
+  localStorage.setItem('spotify_access_token', data.access_token);
+  localStorage.setItem('spotify_access_token_expires_at', String(expiresAt));
+  localStorage.removeItem('spotify_pkce_verifier');
+  window.history.replaceState({}, document.title, window.location.pathname);
 }
 
 function initWebPlaybackSdk() {
@@ -206,17 +254,20 @@ setInterval(rotate, 5000);
 
 fetchPhotos().then(rotate);
 loadSpotifyConfig().then(() => {
-  parseTokenFromHash();
-  spotifyToken = loadStoredToken();
-  if (spotifyToken) {
-    setConnectedUi(true);
-    initWebPlaybackSdk().catch(() => setStatus('Failed to initialize Spotify player'));
-  }
+  exchangeCodeForToken()
+    .then(() => {
+      spotifyToken = loadStoredToken();
+      if (spotifyToken) {
+        setConnectedUi(true);
+        initWebPlaybackSdk().catch(() => setStatus('Failed to initialize Spotify player'));
+      }
+    })
+    .catch(() => setStatus('Spotify login failed; please connect again.'));
 });
 
 spotifyConnect.addEventListener('click', () => {
   setStatus('Redirecting to Spotify...');
-  connectSpotify();
+  connectSpotify().catch(() => setStatus('Failed to start Spotify login'));
 });
 spotifyPlay.addEventListener('click', () => {
   playFirstPlaylist().catch(() => setStatus('Failed to start playback'));
