@@ -62,6 +62,10 @@ function setStatus(message) {
   spotifyStatus.textContent = message;
 }
 
+function setConnectedUi(connected) {
+  spotifyConnect.classList.toggle('hidden', connected);
+}
+
 function parseTokenFromHash() {
   const params = new URLSearchParams(window.location.hash.slice(1));
   const accessToken = params.get('access_token');
@@ -205,11 +209,15 @@ loadSpotifyConfig().then(() => {
   parseTokenFromHash();
   spotifyToken = loadStoredToken();
   if (spotifyToken) {
+    setConnectedUi(true);
     initWebPlaybackSdk().catch(() => setStatus('Failed to initialize Spotify player'));
   }
 });
 
-spotifyConnect.addEventListener('click', connectSpotify);
+spotifyConnect.addEventListener('click', () => {
+  setStatus('Redirecting to Spotify...');
+  connectSpotify();
+});
 spotifyPlay.addEventListener('click', () => {
   playFirstPlaylist().catch(() => setStatus('Failed to start playback'));
 });
