@@ -1,5 +1,24 @@
 # AI Photo Booth
 
+## Spotify setup (optional)
+
+If you want to enable Spotify-driven features, create a Spotify app in the
+[Spotify Developer Dashboard](https://developer.spotify.com/dashboard), then copy the app credentials.
+
+Recommended redirect URI for local Flask development:
+
+- `http://localhost:5000/api/spotify/callback`
+
+Add the following values to your `.env` file:
+
+- `SPOTIFY_CLIENT_ID=...`
+- `SPOTIFY_CLIENT_SECRET=...`
+- `SPOTIFY_REDIRECT_URI=http://localhost:5000/api/spotify/callback`
+- `SPOTIFY_SCOPES=user-read-playback-state user-read-currently-playing`
+
+If these values are missing, the app logs a startup warning and continues
+running so the slideshow and photo booth still work without Spotify.
+
 ## AI worker concurrency
 
 The app processes OpenAI image edits in background worker threads.
