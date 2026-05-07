@@ -8,19 +8,14 @@
 </head>
 <body class="slideshow-body">
   <div class="spotify-controls">
+    <button id="spotifyConnect" type="button">Connect Spotify</button>
     <button id="spotifyPlay" type="button">Play</button>
     <button id="spotifyStop" type="button">Stop</button>
   </div>
-  <iframe
-    id="spotifyPlayer"
-    class="spotify-player"
-    src=""
-    allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
-    loading="lazy"
-    title="Spotify Web Player"
-  ></iframe>
+  <div id="spotifyStatus" class="spotify-status">Spotify not connected</div>
   <div id="emptyState">Waiting for photos...</div>
   <img id="slide" class="hidden" alt="AI slide" />
+  <script src="https://sdk.scdn.co/spotify-player.js"></script>
   <script src="/static/slideshow.js"></script>
 </body>
 </html>
