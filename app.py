@@ -92,6 +92,11 @@ def slideshow_page():
     return app.send_static_file("slideshow.html")
 
 
+@app.route("/api/spotify/callback")
+def spotify_callback_page():
+    return app.send_static_file("spotify-callback.html")
+
+
 @app.route("/photos/<path:filename>")
 def photo_file(filename):
     return send_from_directory(PHOTOS_DIR, filename)
@@ -150,6 +155,15 @@ def get_photos():
 
     items.sort(key=lambda x: x["created_at"])
     return jsonify(items)
+
+
+@app.get("/api/spotify/config")
+def spotify_config():
+    client_id = os.getenv("SPOTIFY_CLIENT_ID", "")
+    redirect_uri = os.getenv("SPOTIFY_REDIRECT_URI", "").strip()
+    if not redirect_uri:
+        redirect_uri = f"{request.host_url.rstrip('/')}/api/spotify/callback"
+    return jsonify({"client_id": client_id, "redirect_uri": redirect_uri})
 
 
 if __name__ == "__main__":
