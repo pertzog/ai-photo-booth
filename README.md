@@ -20,7 +20,8 @@ To prevent unbounded memory growth under heavy load, the queue size can be bound
 To play your own Spotify playlists from the slideshow page:
 
 - Set `SPOTIFY_CLIENT_ID` in your environment.
-- In Spotify Developer Dashboard, add `http://localhost:5000/slideshow` (or your deployed URL) as a Redirect URI.
+- Set `SPOTIFY_REDIRECT_URI` to the exact callback URL you want to use (for example, `http://127.0.0.1:5000/slideshow` or `http://localhost:5000/slideshow`).
+- In Spotify Developer Dashboard, add that exact same URL as a Redirect URI (must match protocol, host, port, and path exactly).
 - Open `/slideshow`, click **Connect Spotify**, authorize your Premium account, then use **Play** and **Stop**.
 
 The app uses Spotify Authorization Code Flow with PKCE (`response_type=code`).

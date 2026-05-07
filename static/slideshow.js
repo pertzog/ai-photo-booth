@@ -55,7 +55,10 @@ async function loadSpotifyConfig() {
 
   if (!spotifyClientId) {
     spotifyStatus.textContent = 'Missing SPOTIFY_CLIENT_ID on server';
+    return;
   }
+
+  setStatus(`Spotify redirect URI: ${spotifyRedirectUri}`);
 }
 
 function setStatus(message) {

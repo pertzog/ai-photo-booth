@@ -155,7 +155,9 @@ def get_photos():
 @app.get("/api/spotify/config")
 def spotify_config():
     client_id = os.getenv("SPOTIFY_CLIENT_ID", "")
-    redirect_uri = f"{request.host_url.rstrip('/')}/slideshow"
+    redirect_uri = os.getenv("SPOTIFY_REDIRECT_URI", "").strip()
+    if not redirect_uri:
+        redirect_uri = f"{request.host_url.rstrip('/')}/slideshow"
     return jsonify({"client_id": client_id, "redirect_uri": redirect_uri})
 
 
