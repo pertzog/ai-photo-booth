@@ -5,11 +5,14 @@ import queue
 import random
 import shutil
 import threading
-from datetime import datetime, timezone
+import secrets
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from urllib.parse import urlencode
+from urllib.request import Request, urlopen
 
 from dotenv import load_dotenv
-from flask import Flask, jsonify, request, send_from_directory
+from flask import Flask, jsonify, redirect, request, send_from_directory, session
 from openai import OpenAI
 
 load_dotenv()
@@ -24,6 +27,7 @@ ORIGINALS_DIR.mkdir(parents=True, exist_ok=True)
 AI_DIR.mkdir(parents=True, exist_ok=True)
 
 app = Flask(__name__, static_folder="static", static_url_path="/static")
+app.secret_key = os.getenv("FLASK_SECRET_KEY") or os.urandom(32)
 
 with open(FILTERS_FILE, "r", encoding="utf-8") as f:
     FILTERS = json.load(f)
@@ -105,6 +109,96 @@ print(
     f"[startup] AI workers: {AI_WORKER_COUNT}; queue max size: "
     f"{'unbounded' if AI_JOB_QUEUE_MAXSIZE == 0 else AI_JOB_QUEUE_MAXSIZE}"
 )
+
+
+def _spotify_enabled():
+    return SPOTIFY_CONFIG is not None
+
+
+def _spotify_state_key():
+    return "spotify_oauth_state"
+
+
+
+@app.get("/api/spotify/login")
+def spotify_login():
+    if not _spotify_enabled():
+        return jsonify({"ok": False, "error": "Spotify integration is not configured"}), 503
+
+    state = secrets.token_urlsafe(24)
+    session[_spotify_state_key()] = state
+
+    params = {
+        "response_type": "code",
+        "client_id": SPOTIFY_CONFIG["client_id"],
+        "redirect_uri": SPOTIFY_CONFIG["redirect_uri"],
+        "scope": SPOTIFY_CONFIG["scopes"],
+        "state": state,
+    }
+    authorize_url = "https://accounts.spotify.com/authorize?" + urlencode(params)
+    return redirect(authorize_url)
+
+
+@app.get("/api/spotify/callback")
+def spotify_callback():
+    if not _spotify_enabled():
+        return redirect("/slideshow")
+
+    request_state = request.args.get("state", "")
+    expected_state = session.get(_spotify_state_key(), "")
+    session.pop(_spotify_state_key(), None)
+
+    if not request_state or not expected_state or request_state != expected_state:
+        return redirect("/slideshow")
+
+    code = request.args.get("code", "")
+    if not code:
+        return redirect("/slideshow")
+
+    token_data = urlencode(
+        {
+            "grant_type": "authorization_code",
+            "code": code,
+            "redirect_uri": SPOTIFY_CONFIG["redirect_uri"],
+            "client_id": SPOTIFY_CONFIG["client_id"],
+            "client_secret": SPOTIFY_CONFIG["client_secret"],
+        }
+    ).encode("utf-8")
+
+    try:
+        token_request = Request(
+            "https://accounts.spotify.com/api/token",
+            data=token_data,
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
+            method="POST",
+        )
+        with urlopen(token_request, timeout=10) as resp:
+            token_response = json.loads(resp.read().decode("utf-8"))
+
+        access_token = token_response.get("access_token")
+        refresh_token = token_response.get("refresh_token")
+        expires_in = int(token_response.get("expires_in", 0))
+
+        if access_token:
+            expires_at = (datetime.now(timezone.utc) + timedelta(seconds=expires_in)).isoformat()
+            session["spotify_access_token"] = access_token
+            if refresh_token:
+                session["spotify_refresh_token"] = refresh_token
+            session["spotify_expires_at"] = expires_at
+    except Exception:
+        pass
+
+    return redirect("/slideshow")
+
+
+@app.post("/api/spotify/logout")
+def spotify_logout():
+    session.pop(_spotify_state_key(), None)
+    session.pop("spotify_access_token", None)
+    session.pop("spotify_refresh_token", None)
+    session.pop("spotify_expires_at", None)
+    return jsonify({"ok": True})
+
 
 
 @app.route("/")
