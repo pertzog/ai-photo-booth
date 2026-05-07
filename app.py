@@ -62,6 +62,12 @@ def _load_spotify_config():
 
 
 SPOTIFY_CONFIG = _load_spotify_config()
+SPOTIFY_PLAYBACK_MODE = os.getenv("SPOTIFY_PLAYBACK_MODE", "false").strip().lower() in {
+    "1",
+    "true",
+    "yes",
+    "on",
+}
 
 
 def _client():
@@ -330,18 +336,26 @@ def spotify_logout():
 @app.get("/api/spotify/status")
 def spotify_status():
     if not _spotify_enabled():
-        return jsonify({"connected": False, "configured": False})
+        return jsonify({"connected": False, "configured": False, "playback_mode": False})
 
     access_token = get_valid_access_token()
     if not access_token:
-        return jsonify({"connected": False, "configured": True})
+        return jsonify(
+            {"connected": False, "configured": True, "playback_mode": SPOTIFY_PLAYBACK_MODE}
+        )
 
     profile_result = _spotify_api_get("/me", access_token)
     if not profile_result["ok"]:
         if profile_result["status"] == 401:
             session.pop("spotify_access_token", None)
             session.pop("spotify_expires_at", None)
-            return jsonify({"connected": False, "configured": True})
+            return jsonify(
+                {
+                    "connected": False,
+                    "configured": True,
+                    "playback_mode": SPOTIFY_PLAYBACK_MODE,
+                }
+            )
         return _spotify_safe_error(profile_result["message"], profile_result["status"])
 
     profile = profile_result.get("data") or {}
@@ -353,7 +367,22 @@ def spotify_status():
             "display_name": profile.get("display_name"),
             "product": profile.get("product"),
         },
+        "playback_mode": SPOTIFY_PLAYBACK_MODE,
     })
+
+
+@app.get("/api/spotify/web-playback-token")
+def spotify_web_playback_token():
+    if not _spotify_enabled():
+        return jsonify({"ok": False, "error": "Spotify integration is not configured"}), 503
+    if not SPOTIFY_PLAYBACK_MODE:
+        return jsonify({"ok": False, "error": "Playback mode is disabled"}), 403
+
+    access_token = get_valid_access_token()
+    if not access_token:
+        return jsonify({"ok": False, "error": "Spotify is not connected"}), 401
+
+    return jsonify({"ok": True, "access_token": access_token})
 
 
 @app.get("/api/spotify/now-playing")
