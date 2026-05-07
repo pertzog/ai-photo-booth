@@ -30,6 +30,19 @@ When playback mode is enabled, add these scopes as needed:
 If these values are missing, the app logs a startup warning and continues
 running so the slideshow and photo booth still work without Spotify.
 
+### Troubleshooting `redirect_uri: Not matching configuration`
+
+Spotify requires an exact match between the authorization request
+`redirect_uri` and one of the callback URLs configured in your Spotify app.
+
+- In Spotify Developer Dashboard, add the exact callback URL your browser uses,
+  for example: `http://localhost:5000/api/spotify/callback`.
+- Ensure `SPOTIFY_REDIRECT_URI` exactly matches (including scheme, host, port,
+  and path).
+- If `SPOTIFY_REDIRECT_URI` is unset, this app falls back to the current
+  request host (for example `http://127.0.0.1:5000/api/spotify/callback`),
+  which must also be whitelisted in Spotify.
+
 ## AI worker concurrency
 
 The app processes OpenAI image edits in background worker threads.

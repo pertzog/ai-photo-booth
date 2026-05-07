@@ -47,7 +47,7 @@ def _load_spotify_config():
         "scopes": os.getenv("SPOTIFY_SCOPES", "").strip(),
     }
 
-    missing_keys = [key for key, value in config.items() if not value]
+    missing_keys = [key for key in ("client_id", "client_secret", "scopes") if not config[key]]
     if missing_keys:
         print(
             "[startup][warning] Spotify integration is disabled. "
@@ -58,6 +58,12 @@ def _load_spotify_config():
         return None
 
     print("[startup] Spotify integration is enabled.")
+    if not config["redirect_uri"]:
+        print(
+            "[startup][warning] SPOTIFY_REDIRECT_URI is not set. "
+            "Using request host fallback for OAuth redirect URI. "
+            "Make sure that exact callback URL is added in the Spotify app settings."
+        )
     return config
 
 
@@ -124,6 +130,17 @@ def _spotify_enabled():
 
 def _spotify_state_key():
     return "spotify_oauth_state"
+
+
+def _spotify_redirect_uri_key():
+    return "spotify_redirect_uri"
+
+
+def _resolve_spotify_redirect_uri():
+    configured = (SPOTIFY_CONFIG or {}).get("redirect_uri", "").strip()
+    if configured:
+        return configured
+    return f"{request.url_root.rstrip('/')}/api/spotify/callback"
 
 
 def spotify_token_expired():
@@ -257,13 +274,15 @@ def spotify_login():
     if not _spotify_enabled():
         return jsonify({"ok": False, "error": "Spotify integration is not configured"}), 503
 
+    redirect_uri = _resolve_spotify_redirect_uri()
     state = secrets.token_urlsafe(24)
     session[_spotify_state_key()] = state
+    session[_spotify_redirect_uri_key()] = redirect_uri
 
     params = {
         "response_type": "code",
         "client_id": SPOTIFY_CONFIG["client_id"],
-        "redirect_uri": SPOTIFY_CONFIG["redirect_uri"],
+        "redirect_uri": redirect_uri,
         "scope": SPOTIFY_CONFIG["scopes"],
         "state": state,
     }
@@ -275,6 +294,9 @@ def spotify_login():
 def spotify_callback():
     if not _spotify_enabled():
         return redirect("/slideshow")
+
+    redirect_uri = session.get(_spotify_redirect_uri_key()) or _resolve_spotify_redirect_uri()
+    session.pop(_spotify_redirect_uri_key(), None)
 
     request_state = request.args.get("state", "")
     expected_state = session.get(_spotify_state_key(), "")
@@ -291,7 +313,7 @@ def spotify_callback():
         {
             "grant_type": "authorization_code",
             "code": code,
-            "redirect_uri": SPOTIFY_CONFIG["redirect_uri"],
+            "redirect_uri": redirect_uri,
             "client_id": SPOTIFY_CONFIG["client_id"],
             "client_secret": SPOTIFY_CONFIG["client_secret"],
         }
@@ -483,3 +505,5 @@ def get_photos():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
+    redirect_uri = session.get(_spotify_redirect_uri_key()) or _resolve_spotify_redirect_uri()
+    session.pop(_spotify_redirect_uri_key(), None)
