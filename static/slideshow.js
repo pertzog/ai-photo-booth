@@ -1,5 +1,10 @@
 const emptyState = document.getElementById('emptyState');
 const slide = document.getElementById('slide');
+const spotifyPlayer = document.getElementById('spotifyPlayer');
+const spotifyPlay = document.getElementById('spotifyPlay');
+const spotifyStop = document.getElementById('spotifyStop');
+
+const spotifyEmbedUrl = 'https://open.spotify.com/embed/playlist/37i9dQZF1DXcBWIGoYBM5M?utm_source=generator';
 
 let photos = [];
 let current = 0;
@@ -33,3 +38,11 @@ setInterval(fetchPhotos, 5000);
 setInterval(rotate, 5000);
 
 fetchPhotos().then(rotate);
+
+spotifyPlay.addEventListener('click', () => {
+  spotifyPlayer.src = `${spotifyEmbedUrl}&autoplay=1`;
+});
+
+spotifyStop.addEventListener('click', () => {
+  spotifyPlayer.src = '';
+});
