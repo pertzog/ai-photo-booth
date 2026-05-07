@@ -2,6 +2,7 @@ const emptyState = document.getElementById('emptyState');
 const slide = document.getElementById('slide');
 const spotifyConnectBtn = document.getElementById('spotifyConnectBtn');
 const spotifyDisconnectBtn = document.getElementById('spotifyDisconnectBtn');
+const spotifyPlayBtn = document.getElementById('spotifyPlayBtn');
 const spotifyStatus = document.getElementById('spotifyStatus');
 const trackInfo = document.getElementById('trackInfo');
 const trackArt = document.getElementById('trackArt');
@@ -9,6 +10,9 @@ const trackMeta = document.getElementById('trackMeta');
 
 let photos = [];
 let current = 0;
+let spotifyPlaybackMode = false;
+let spotifyPlayer = null;
+let spotifyDeviceId = null;
 
 function setStatusText(text) {
   spotifyStatus.textContent = text;
@@ -45,6 +49,9 @@ async function fetchSpotifyStatus() {
     if (!res.ok) throw new Error('status failed');
 
     const data = await res.json();
+    spotifyPlaybackMode = Boolean(data?.playback_mode);
+    spotifyPlayBtn?.classList.toggle('hidden', !spotifyPlaybackMode || !data?.connected);
+
     if (!data?.connected) {
       setStatusText('Not connected');
       renderTrack(null);
@@ -61,6 +68,52 @@ async function fetchSpotifyStatus() {
   } catch {
     setStatusText('Not connected');
   }
+}
+
+function initSpotifyWebPlayback() {
+  if (!spotifyPlaybackMode) {
+    return;
+  }
+  if (!window.Spotify) {
+    setStatusText('Spotify SDK not available');
+    return;
+  }
+  if (spotifyPlayer) {
+    return;
+  }
+
+  spotifyPlayer = new window.Spotify.Player({
+    name: 'AI Photo Booth Slideshow',
+    getOAuthToken: async (cb) => {
+      const res = await fetch('/api/spotify/web-playback-token');
+      if (!res.ok) {
+        setStatusText('Unable to get playback token');
+        return;
+      }
+      const data = await res.json();
+      cb(data.access_token);
+    },
+    volume: 0.8,
+  });
+
+  spotifyPlayer.addListener('ready', ({ device_id }) => {
+    spotifyDeviceId = device_id;
+    setStatusText('Playback ready. Choose this device in Spotify.');
+  });
+  spotifyPlayer.addListener('not_ready', () => {
+    setStatusText('Playback device offline');
+  });
+  spotifyPlayer.addListener('initialization_error', ({ message }) => {
+    setStatusText(`Playback init failed: ${message}`);
+  });
+  spotifyPlayer.addListener('authentication_error', ({ message }) => {
+    setStatusText(`Playback auth failed: ${message}`);
+  });
+  spotifyPlayer.addListener('account_error', ({ message }) => {
+    setStatusText(`Playback requires Premium: ${message}`);
+  });
+
+  spotifyPlayer.connect();
 }
 
 async function fetchNowPlaying() {
@@ -130,6 +183,13 @@ spotifyDisconnectBtn?.addEventListener('click', async () => {
   } finally {
     setStatusText('Not connected');
     renderTrack(null);
+  }
+});
+
+spotifyPlayBtn?.addEventListener('click', () => {
+  initSpotifyWebPlayback();
+  if (spotifyDeviceId) {
+    setStatusText('Playback enabled. Transfer playback in your Spotify app.');
   }
 });
 

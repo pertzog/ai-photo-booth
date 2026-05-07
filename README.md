@@ -15,6 +15,17 @@ Add the following values to your `.env` file:
 - `SPOTIFY_CLIENT_SECRET=...`
 - `SPOTIFY_REDIRECT_URI=http://localhost:5000/api/spotify/callback`
 - `SPOTIFY_SCOPES=user-read-playback-state user-read-currently-playing`
+- `SPOTIFY_PLAYBACK_MODE=false` (default)
+
+Playback mode is optional and adds complexity. Keep `SPOTIFY_PLAYBACK_MODE=false`
+for display-only metadata mode, or set it to `true` to enable browser playback
+via the Spotify Web Playback SDK.
+
+When playback mode is enabled, add these scopes as needed:
+
+- `streaming user-modify-playback-state user-read-email user-read-private`
+
+> Note: Spotify Web Playback commonly requires a Spotify Premium account.
 
 If these values are missing, the app logs a startup warning and continues
 running so the slideshow and photo booth still work without Spotify.
