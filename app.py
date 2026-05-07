@@ -9,6 +9,7 @@ import secrets
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from urllib.parse import urlencode
+from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 from dotenv import load_dotenv
@@ -119,6 +120,131 @@ def _spotify_state_key():
     return "spotify_oauth_state"
 
 
+def spotify_token_expired():
+    expires_at = session.get("spotify_expires_at")
+    if not expires_at:
+        return True
+
+    try:
+        expires_dt = datetime.fromisoformat(expires_at)
+        if expires_dt.tzinfo is None:
+            expires_dt = expires_dt.replace(tzinfo=timezone.utc)
+    except (TypeError, ValueError):
+        return True
+
+    # Refresh slightly early to avoid race conditions around expiry.
+    return datetime.now(timezone.utc) >= (expires_dt - timedelta(seconds=30))
+
+
+def refresh_spotify_token(refresh_token):
+    if not _spotify_enabled() or not refresh_token:
+        return None
+
+    token_data = urlencode(
+        {
+            "grant_type": "refresh_token",
+            "refresh_token": refresh_token,
+            "client_id": SPOTIFY_CONFIG["client_id"],
+            "client_secret": SPOTIFY_CONFIG["client_secret"],
+        }
+    ).encode("utf-8")
+
+    token_request = Request(
+        "https://accounts.spotify.com/api/token",
+        data=token_data,
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+        method="POST",
+    )
+
+    with urlopen(token_request, timeout=10) as resp:
+        token_response = json.loads(resp.read().decode("utf-8"))
+
+    access_token = token_response.get("access_token")
+    if not access_token:
+        return None
+
+    expires_in = int(token_response.get("expires_in", 0))
+    expires_at = (datetime.now(timezone.utc) + timedelta(seconds=expires_in)).isoformat()
+    session["spotify_access_token"] = access_token
+    session["spotify_expires_at"] = expires_at
+
+    new_refresh_token = token_response.get("refresh_token")
+    if new_refresh_token:
+        session["spotify_refresh_token"] = new_refresh_token
+
+    return access_token
+
+
+def get_valid_access_token():
+    access_token = session.get("spotify_access_token")
+    refresh_token = session.get("spotify_refresh_token")
+
+    if not access_token and not refresh_token:
+        return None
+
+    if access_token and not spotify_token_expired():
+        return access_token
+
+    try:
+        return refresh_spotify_token(refresh_token)
+    except Exception:
+        session.pop("spotify_access_token", None)
+        session.pop("spotify_expires_at", None)
+        return None
+
+
+def _spotify_safe_error(message, status_code=502):
+    return jsonify({"ok": False, "error": message}), status_code
+
+
+def _spotify_api_get(path, access_token):
+    api_request = Request(
+        f"https://api.spotify.com/v1{path}",
+        headers={"Authorization": f"Bearer {access_token}"},
+        method="GET",
+    )
+
+    try:
+        with urlopen(api_request, timeout=10) as resp:
+            status_code = getattr(resp, "status", resp.getcode())
+            if status_code == 204:
+                return {"ok": True, "status": 204, "data": None}
+            body = resp.read().decode("utf-8")
+            data = json.loads(body) if body else None
+            return {"ok": True, "status": status_code, "data": data}
+    except HTTPError as e:
+        if e.code == 204:
+            return {"ok": True, "status": 204, "data": None}
+        if e.code == 401:
+            return {"ok": False, "status": 401, "message": "Spotify authorization expired"}
+        if e.code == 403:
+            return {"ok": False, "status": 403, "message": "Spotify access is not permitted for this account"}
+        if e.code == 429:
+            return {"ok": False, "status": 429, "message": "Spotify rate limit reached, please retry shortly"}
+        return {"ok": False, "status": e.code, "message": "Spotify request failed"}
+    except URLError:
+        return {"ok": False, "status": 503, "message": "Spotify service is temporarily unavailable"}
+    except Exception:
+        return {"ok": False, "status": 500, "message": "Unexpected Spotify error"}
+
+
+def _normalize_now_playing(playback_data):
+    item = (playback_data or {}).get("item") or {}
+    album = item.get("album") or {}
+    images = album.get("images") or []
+    artists = item.get("artists") or []
+
+    return {
+        "is_playing": bool((playback_data or {}).get("is_playing", False)),
+        "track_name": item.get("name"),
+        "artist_names": [artist.get("name") for artist in artists if artist.get("name")],
+        "album_name": album.get("name"),
+        "album_image_url": (images[0] or {}).get("url") if images else None,
+        "progress_ms": (playback_data or {}).get("progress_ms"),
+        "duration_ms": item.get("duration_ms"),
+        "external_url": ((item.get("external_urls") or {}).get("spotify")),
+    }
+
 
 @app.get("/api/spotify/login")
 def spotify_login():
@@ -199,6 +325,61 @@ def spotify_logout():
     session.pop("spotify_expires_at", None)
     return jsonify({"ok": True})
 
+
+
+@app.get("/api/spotify/status")
+def spotify_status():
+    if not _spotify_enabled():
+        return jsonify({"connected": False, "configured": False})
+
+    access_token = get_valid_access_token()
+    if not access_token:
+        return jsonify({"connected": False, "configured": True})
+
+    profile_result = _spotify_api_get("/me", access_token)
+    if not profile_result["ok"]:
+        if profile_result["status"] == 401:
+            session.pop("spotify_access_token", None)
+            session.pop("spotify_expires_at", None)
+            return jsonify({"connected": False, "configured": True})
+        return _spotify_safe_error(profile_result["message"], profile_result["status"])
+
+    profile = profile_result.get("data") or {}
+    return jsonify({
+        "connected": True,
+        "configured": True,
+        "profile": {
+            "id": profile.get("id"),
+            "display_name": profile.get("display_name"),
+            "product": profile.get("product"),
+        },
+    })
+
+
+@app.get("/api/spotify/now-playing")
+def spotify_now_playing():
+    if not _spotify_enabled():
+        return jsonify({"connected": False})
+
+    access_token = get_valid_access_token()
+    if not access_token:
+        return jsonify({"connected": False})
+
+    playback_result = _spotify_api_get("/me/player/currently-playing", access_token)
+
+    if not playback_result["ok"]:
+        if playback_result["status"] == 401:
+            session.pop("spotify_access_token", None)
+            session.pop("spotify_expires_at", None)
+            return jsonify({"connected": False})
+        return _spotify_safe_error(playback_result["message"], playback_result["status"])
+
+    if playback_result["status"] == 204 or not playback_result.get("data"):
+        return jsonify({"connected": True, "is_playing": False})
+
+    normalized = _normalize_now_playing(playback_result["data"])
+    normalized["connected"] = True
+    return jsonify(normalized)
 
 
 @app.route("/")
