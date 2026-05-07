@@ -34,6 +34,31 @@ AI_JOB_QUEUE_MAXSIZE = max(0, int(os.getenv("AI_JOB_QUEUE_MAXSIZE", "0")))
 job_queue = queue.Queue(maxsize=AI_JOB_QUEUE_MAXSIZE)
 
 
+def _load_spotify_config():
+    config = {
+        "client_id": os.getenv("SPOTIFY_CLIENT_ID", "").strip(),
+        "client_secret": os.getenv("SPOTIFY_CLIENT_SECRET", "").strip(),
+        "redirect_uri": os.getenv("SPOTIFY_REDIRECT_URI", "").strip(),
+        "scopes": os.getenv("SPOTIFY_SCOPES", "").strip(),
+    }
+
+    missing_keys = [key for key, value in config.items() if not value]
+    if missing_keys:
+        print(
+            "[startup][warning] Spotify integration is disabled. "
+            "Missing env var(s): "
+            f"{', '.join(f'SPOTIFY_{key.upper()}' for key in missing_keys)}. "
+            "Slideshow and photo booth will continue to run without Spotify."
+        )
+        return None
+
+    print("[startup] Spotify integration is enabled.")
+    return config
+
+
+SPOTIFY_CONFIG = _load_spotify_config()
+
+
 def _client():
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
