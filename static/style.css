@@ -54,59 +54,6 @@ video, #preview {
   height: 100vh;
 }
 
-.music-panel {
-  position: fixed;
-  top: 16px;
-  left: 16px;
-  z-index: 10;
-  max-width: 320px;
-  color: #fff;
-  background: rgba(0, 0, 0, 0.58);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 10px;
-  padding: 10px;
-  backdrop-filter: blur(3px);
-}
-
-.music-actions {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 8px;
-}
-
-.music-actions button {
-  border: 0;
-  border-radius: 6px;
-  padding: 6px 10px;
-  font-size: 13px;
-  cursor: pointer;
-}
-
-.music-status {
-  font-size: 14px;
-  line-height: 1.3;
-}
-
-.track-info {
-  margin-top: 8px;
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-
-.track-art {
-  width: 48px;
-  height: 48px;
-  border-radius: 6px;
-  object-fit: cover;
-  flex-shrink: 0;
-}
-
-.track-meta {
-  font-size: 13px;
-  line-height: 1.3;
-}
-
 #slide {
   max-width: 100vw;
   max-height: 100vh;

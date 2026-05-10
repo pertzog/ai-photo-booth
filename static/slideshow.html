@@ -7,21 +7,8 @@
   <link rel="stylesheet" href="/static/style.css" />
 </head>
 <body class="slideshow-body">
-  <div id="musicPanel" class="music-panel" aria-live="polite">
-    <div class="music-actions">
-      <button id="spotifyConnectBtn" type="button">Connect Spotify</button>
-      <button id="spotifyDisconnectBtn" type="button">Disconnect</button>
-      <button id="spotifyPlayBtn" type="button" class="hidden">Enable Audio Playback</button>
-    </div>
-    <div id="spotifyStatus" class="music-status">Not connected</div>
-    <div id="trackInfo" class="track-info hidden">
-      <img id="trackArt" class="track-art hidden" alt="Album art" />
-      <div id="trackMeta" class="track-meta"></div>
-    </div>
-  </div>
   <div id="emptyState">Waiting for photos...</div>
   <img id="slide" class="hidden" alt="AI slide" />
-  <script src="https://sdk.scdn.co/spotify-player.js"></script>
   <script src="/static/slideshow.js"></script>
 </body>
 </html>
