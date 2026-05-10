@@ -22,6 +22,10 @@ video, #preview {
   background: #000;
 }
 
+#camera {
+  transform: scaleX(-1);
+}
+
 .overlay {
   position: absolute;
   top: 40%;

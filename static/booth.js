@@ -41,7 +41,11 @@ function captureFrame() {
   canvas.width = w;
   canvas.height = h;
   const ctx = canvas.getContext('2d');
+  ctx.save();
+  ctx.translate(w, 0);
+  ctx.scale(-1, 1);
   ctx.drawImage(camera, 0, 0, w, h);
+  ctx.restore();
   return canvas.toDataURL('image/png');
 }
 
