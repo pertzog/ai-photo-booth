@@ -11,6 +11,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 from flask import Flask, jsonify, request, send_from_directory
 from openai import OpenAI
+from PIL import Image, ImageDraw, ImageFont
 
 load_dotenv()
 
@@ -18,10 +19,12 @@ BASE_DIR = Path(__file__).parent
 PHOTOS_DIR = BASE_DIR / "photos"
 ORIGINALS_DIR = PHOTOS_DIR / "originals"
 AI_DIR = PHOTOS_DIR / "ai"
+FINAL_DIR = PHOTOS_DIR / "final"
 FILTERS_FILE = BASE_DIR / "filters.json"
 
 ORIGINALS_DIR.mkdir(parents=True, exist_ok=True)
 AI_DIR.mkdir(parents=True, exist_ok=True)
+FINAL_DIR.mkdir(parents=True, exist_ok=True)
 
 app = Flask(__name__, static_folder="static", static_url_path="/static")
 
@@ -59,6 +62,40 @@ def generate_ai_image(input_path: Path, output_path: Path, prompt: str):
         f.write(base64.b64decode(image_data))
 
 
+
+
+def create_final_image(original_path: Path, ai_path: Path, final_path: Path):
+    with Image.open(original_path) as original_img, Image.open(ai_path) as ai_img:
+        original_img = original_img.convert("RGB")
+        ai_img = ai_img.convert("RGB")
+
+        target_height = max(original_img.height, ai_img.height)
+
+        def _resize_to_height(img: Image.Image) -> Image.Image:
+            if img.height == target_height:
+                return img
+            target_width = int(img.width * (target_height / img.height))
+            return img.resize((target_width, target_height), Image.Resampling.LANCZOS)
+
+        original_img = _resize_to_height(original_img)
+        ai_img = _resize_to_height(ai_img)
+
+        label_band_height = 70
+        combined_width = original_img.width + ai_img.width
+        combined_height = target_height + label_band_height
+
+        combined = Image.new("RGB", (combined_width, combined_height), color="white")
+        combined.paste(original_img, (0, 0))
+        combined.paste(ai_img, (original_img.width, 0))
+
+        draw = ImageDraw.Draw(combined)
+        font = ImageFont.load_default()
+        label_y = target_height + 24
+        draw.text((24, label_y), "Original", fill="black", font=font)
+        draw.text((original_img.width + 24, label_y), "AI Version", fill="black", font=font)
+
+        combined.save(final_path, format="PNG")
+
 def _process_ai_jobs():
     while True:
         job = job_queue.get()
@@ -66,6 +103,11 @@ def _process_ai_jobs():
             generate_ai_image(job["input_path"], job["output_path"], job["prompt"])
         except Exception:
             shutil.copyfile(job["input_path"], job["output_path"])
+
+        try:
+            create_final_image(job["input_path"], job["output_path"], job["final_path"])
+        except Exception:
+            shutil.copyfile(job["output_path"], job["final_path"])
         finally:
             job_queue.task_done()
 
@@ -114,9 +156,11 @@ def capture_photo():
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S_%f")
     original_name = f"{timestamp}.png"
     ai_name = f"{timestamp}_ai.png"
+    final_name = f"{timestamp}_final.png"
 
     original_path = ORIGINALS_DIR / original_name
     ai_path = AI_DIR / ai_name
+    final_path = FINAL_DIR / final_name
 
     with open(original_path, "wb") as f:
         f.write(image_bytes)
@@ -126,6 +170,7 @@ def capture_photo():
         "input_path": original_path,
         "output_path": ai_path,
         "prompt": prompt,
+        "final_path": final_path,
     }
 
     try:
@@ -139,11 +184,11 @@ def capture_photo():
 @app.get("/api/photos")
 def get_photos():
     items = []
-    for file_path in AI_DIR.glob("*.png"):
+    for file_path in FINAL_DIR.glob("*.png"):
         created_at = datetime.fromtimestamp(file_path.stat().st_mtime, tz=timezone.utc).isoformat()
         items.append(
             {
-                "url": f"/photos/ai/{file_path.name}",
+                "url": f"/photos/final/{file_path.name}",
                 "created_at": created_at,
             }
         )
