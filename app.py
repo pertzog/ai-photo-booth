@@ -80,22 +80,34 @@ def create_final_image(original_path: Path, ai_path: Path, final_path: Path):
         original_img = _resize_to_height(original_img)
         ai_img = _resize_to_height(ai_img)
 
-        label_band_height = 140
+        label_band_height = 180
         combined_width = original_img.width + ai_img.width
         combined_height = target_height + label_band_height
 
-        combined = Image.new("RGB", (combined_width, combined_height), color="white")
+        combined = Image.new("RGB", (combined_width, combined_height), color="black")
         combined.paste(original_img, (0, 0))
         combined.paste(ai_img, (original_img.width, 0))
 
         draw = ImageDraw.Draw(combined)
         label_text = "Omer B-Day 16/5/2026"
 
-        font_size = max(48, combined_width // 22)
-        try:
-            font = ImageFont.truetype("DejaVuSans-Bold.ttf", font_size)
-        except OSError:
-            font = ImageFont.load_default()
+        max_text_width = int(combined_width * 0.96)
+        max_text_height = int(label_band_height * 0.9)
+        font_size = min(label_band_height, combined_width // 6)
+
+        while font_size > 10:
+            try:
+                font = ImageFont.truetype("DejaVuSans-Bold.ttf", font_size)
+            except OSError:
+                font = ImageFont.load_default()
+                break
+
+            text_bbox = draw.textbbox((0, 0), label_text, font=font)
+            text_width = text_bbox[2] - text_bbox[0]
+            text_height = text_bbox[3] - text_bbox[1]
+            if text_width <= max_text_width and text_height <= max_text_height:
+                break
+            font_size -= 2
 
         text_bbox = draw.textbbox((0, 0), label_text, font=font)
         text_width = text_bbox[2] - text_bbox[0]
@@ -104,7 +116,7 @@ def create_final_image(original_path: Path, ai_path: Path, final_path: Path):
         label_x = (combined_width - text_width) // 2
         label_y = target_height + (label_band_height - text_height) // 2 - text_bbox[1]
 
-        draw.text((label_x, label_y), label_text, fill="#111111", font=font)
+        draw.text((label_x, label_y), label_text, fill="white", font=font)
 
         combined.save(final_path, format="PNG")
 
