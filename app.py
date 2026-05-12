@@ -64,6 +64,25 @@ def generate_ai_image(input_path: Path, output_path: Path, prompt: str):
 
 
 
+
+
+def _load_label_font(size: int) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
+    font_candidates = [
+        "DejaVuSans-Bold.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+        "/usr/share/fonts/dejavu/DejaVuSans-Bold.ttf",
+        "/Library/Fonts/Arial Bold.ttf",
+        "C:/Windows/Fonts/arialbd.ttf",
+    ]
+
+    for font_path in font_candidates:
+        try:
+            return ImageFont.truetype(font_path, size)
+        except OSError:
+            continue
+
+    return ImageFont.load_default()
+
 def create_final_image(original_path: Path, ai_path: Path, final_path: Path):
     with Image.open(original_path) as original_img, Image.open(ai_path) as ai_img:
         original_img = original_img.convert("RGB")
@@ -96,10 +115,8 @@ def create_final_image(original_path: Path, ai_path: Path, final_path: Path):
         font_size = min(label_band_height, combined_width // 6)
 
         while font_size > 10:
-            try:
-                font = ImageFont.truetype("DejaVuSans-Bold.ttf", font_size)
-            except OSError:
-                font = ImageFont.load_default()
+            font = _load_label_font(font_size)
+            if not hasattr(font, "size"):
                 break
 
             text_bbox = draw.textbbox((0, 0), label_text, font=font)
