@@ -1,0 +1,28 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+  <title>Preview Gallery</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body class="preview-body">
+  <main class="preview-page">
+    <h1>Photo Outcomes</h1>
+    <div id="previewEmptyState" class="preview-empty">No photos yet. Capture one from the booth.</div>
+    <section id="previewGrid" class="preview-grid"></section>
+  </main>
+
+  <div id="previewModal" class="preview-modal hidden" role="dialog" aria-modal="true" aria-label="Photo preview">
+    <button id="previewCloseBtn" class="preview-close" aria-label="Close preview">×</button>
+    <button id="previewPrevBtn" class="preview-nav preview-nav-left" aria-label="Previous photo">‹</button>
+    <figure class="preview-figure">
+      <img id="previewModalImage" alt="Selected photo" />
+      <figcaption id="previewModalLabel"></figcaption>
+    </figure>
+    <button id="previewNextBtn" class="preview-nav preview-nav-right" aria-label="Next photo">›</button>
+  </div>
+
+  <script src="/static/preview.js"></script>
+</body>
+</html>
