@@ -175,6 +175,11 @@ def slideshow_page():
     return app.send_static_file("slideshow.html")
 
 
+@app.route("/preview")
+def preview_page():
+    return app.send_static_file("preview.html")
+
+
 @app.route("/photos/<path:filename>")
 def photo_file(filename):
     return send_from_directory(PHOTOS_DIR, filename)
@@ -225,11 +230,23 @@ def capture_photo():
 @app.get("/api/photos")
 def get_photos():
     items = []
-    for file_path in FINAL_DIR.glob("*.png"):
+    for file_path in FINAL_DIR.glob("*_final.png"):
         created_at = datetime.fromtimestamp(file_path.stat().st_mtime, tz=timezone.utc).isoformat()
+        stem = file_path.name.removesuffix("_final.png")
+        original_name = f"{stem}.png"
+        ai_name = f"{stem}_ai.png"
+
+        original_path = ORIGINALS_DIR / original_name
+        ai_path = AI_DIR / ai_name
+
+        if not original_path.exists() or not ai_path.exists():
+            continue
+
         items.append(
             {
                 "url": f"/photos/final/{file_path.name}",
+                "original_url": f"/photos/originals/{original_name}",
+                "ai_url": f"/photos/ai/{ai_name}",
                 "created_at": created_at,
             }
         )
