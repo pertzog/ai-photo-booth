@@ -64,6 +64,17 @@ video, #preview {
   object-fit: contain;
 }
 
+#floatingImage {
+  position: fixed;
+  top: 24px;
+  right: 24px;
+  width: 160px;
+  height: 160px;
+  object-fit: contain;
+  z-index: 10;
+  pointer-events: none;
+}
+
 #emptyState {
   color: #fff;
   font-size: 48px;
