@@ -79,8 +79,8 @@ video, #preview {
   position: fixed;
   top: 24px;
   right: 24px;
-  width: 160px;
-  height: 160px;
+  width: 80px;
+  height: 80px;
   object-fit: contain;
   z-index: 10;
   pointer-events: none;
