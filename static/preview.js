@@ -10,6 +10,9 @@ const previewNextBtn = document.getElementById('previewNextBtn');
 let photoGroups = [];
 let activeGroupIndex = -1;
 let activeImageIndex = 0;
+let swipeStartX = null;
+let swipeStartY = null;
+const swipeThreshold = 40;
 
 const imageSteps = [
   { key: 'original_url', label: 'Original' },
@@ -91,6 +94,41 @@ previewCloseBtn.addEventListener('click', closeModal);
 previewModal.addEventListener('click', (event) => {
   if (event.target === previewModal) closeModal();
 });
+
+previewModal.addEventListener(
+  'touchstart',
+  (event) => {
+    if (previewModal.classList.contains('hidden') || event.touches.length !== 1) return;
+    swipeStartX = event.touches[0].clientX;
+    swipeStartY = event.touches[0].clientY;
+  },
+  { passive: true }
+);
+
+previewModal.addEventListener(
+  'touchend',
+  (event) => {
+    if (previewModal.classList.contains('hidden') || swipeStartX === null || swipeStartY === null) return;
+    if (event.changedTouches.length !== 1) return;
+
+    const endX = event.changedTouches[0].clientX;
+    const endY = event.changedTouches[0].clientY;
+    const deltaX = endX - swipeStartX;
+    const deltaY = endY - swipeStartY;
+
+    swipeStartX = null;
+    swipeStartY = null;
+
+    if (Math.abs(deltaX) < swipeThreshold || Math.abs(deltaX) < Math.abs(deltaY)) return;
+
+    if (deltaX < 0) {
+      showNext();
+      return;
+    }
+    showPrev();
+  },
+  { passive: true }
+);
 
 document.addEventListener('keydown', (event) => {
   if (previewModal.classList.contains('hidden')) return;
