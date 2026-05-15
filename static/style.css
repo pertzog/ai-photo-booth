@@ -39,11 +39,22 @@ video, #preview {
 
 .main-btn, .actions button {
   margin-top: 16px;
-  padding: 14px 24px;
+  padding: 20px 34px;
   border: none;
   border-radius: 10px;
-  font-size: 22px;
+  font-size: 30px;
+  font-weight: 700;
   cursor: pointer;
+}
+
+#keepBtn {
+  background: #1f9d45;
+  color: #fff;
+}
+
+#retakeBtn {
+  background: #d93025;
+  color: #fff;
 }
 
 .actions { display: flex; gap: 12px; justify-content: center; }
@@ -108,8 +119,9 @@ video, #preview {
   border: 1px solid #303030;
   background: #161616;
   border-radius: 12px;
-  padding: 8px;
+  padding: 12px;
   cursor: pointer;
+  font-size: 20px;
 }
 
 .thumb-btn img {
@@ -151,19 +163,19 @@ video, #preview {
   border: none;
   color: #fff;
   background: rgba(255, 255, 255, 0.2);
-  width: 50px;
-  height: 50px;
+  width: 64px;
+  height: 64px;
   border-radius: 999px;
   cursor: pointer;
 }
 
 .preview-nav {
-  font-size: 34px;
+  font-size: 42px;
 }
 
 .preview-close {
   position: absolute;
   top: 24px;
   right: 24px;
-  font-size: 34px;
+  font-size: 42px;
 }
